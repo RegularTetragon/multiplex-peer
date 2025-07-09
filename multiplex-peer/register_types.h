@@ -1,0 +1,5 @@
+#ifndef STEAMPEER_REGISTER_TYPES_H
+#define STEAMPEER_REGISTER_TYPES_H
+
+
+#endif

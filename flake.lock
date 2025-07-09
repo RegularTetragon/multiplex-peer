@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "godot-cpp": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1738085337,
+        "narHash": "sha256-fB9Up9PiwgxnVi4witcm3LEbg0Z/MiRblhmEbjpI/I4=",
+        "owner": "godotengine",
+        "repo": "godot-cpp",
+        "rev": "f3a1a2fd458dfaf4de08c906f22a2fe9e924b16f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "godotengine",
+        "ref": "f3a1a2fd458dfaf4de08c906f22a2fe9e924b16f",
+        "repo": "godot-cpp",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1749794982,
+        "narHash": "sha256-Kh9K4taXbVuaLC0IL+9HcfvxsSUx8dPB5s5weJcc9pc=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ee930f9755f58096ac6e8ca94a1887e0534e2d81",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "godot-cpp": "godot-cpp",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
