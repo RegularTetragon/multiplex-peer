@@ -3,7 +3,7 @@ entry_symbol = "multiplex_peer_init"
 compatibility_minimum = 4.2
 
 [libraries]
-linux.debug.x86_64 = "bin/linux/libmultiplex-peer.linux.template_debug.x86_64.so"
+linux.debug.x86_64 = "bin/linux/libmultiplex-peer.linux.template_debug.dev.x86_64.so"
 linux.release.x86_64 = "bin/linux/libmultiplex-peer.linux.template_release.x86_64.so"
 macos.debug = "bin/macos/libmultiplex-peer.macos.template_debug.framework"
 macos.release = "bin/macos/libmultiplex-peer.macos.template_release.framework"

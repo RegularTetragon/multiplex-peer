@@ -6,7 +6,6 @@
 #include "multiplex_network.h"
 #include "multiplex_packet.h"
 #include <godot_cpp/variant/utility_functions.hpp>
-#include <mutex>
 
 MultiplexPeer::MultiplexPeer() {
 	this->active_mode = MODE_NONE;
@@ -36,7 +35,7 @@ Error MultiplexPeer::create_client(Ref<MultiplexNetwork> network) {
 }
 Error MultiplexPeer::_get_packet(const uint8_t **r_buffer, int32_t *r_buffer_size) {
 	ERR_FAIL_COND_V_MSG(incoming_packets.size() == 0, ERR_UNAVAILABLE, "No incoming packets available.");
-  printf("MUXNET - PEER - %d get packet called\n", unique_id);
+  // printf("MUXNET - PEER - %d get packet called\n", unique_id);
 	this->current_packet = incoming_packets.front()->get();
 	incoming_packets.pop_front();
   
@@ -47,7 +46,7 @@ Error MultiplexPeer::_get_packet(const uint8_t **r_buffer, int32_t *r_buffer_siz
 	return OK;
 }
 Error MultiplexPeer::_put_packet(const uint8_t *p_buffer, int32_t p_buffer_size) {
-  printf("MUXNET - PEER - %d put packet called, target is %d\n", unique_id, this->target_peer);
+  // printf("MUXNET - PEER - %d put packet called, target is %d\n", unique_id, this->target_peer);
 	ERR_FAIL_COND_V_MSG(active_mode == MODE_NONE, ERR_UNCONFIGURED, "Peer is not in a MultiplexNetwork");
 	ERR_FAIL_COND_V_MSG(
 			this->target_peer != 0 &&
@@ -106,7 +105,7 @@ int32_t MultiplexPeer::_get_packet_peer() const {
   ERR_FAIL_COND_V_MSG(active_mode == MODE_NONE, 1, "The multiplayer instance isn't currently active.");
 	ERR_FAIL_COND_V_MSG(incoming_packets.size() == 0, 1, "No packets to receive.");
   auto peer = this->incoming_packets.front()->get()->contents.data.mux_peer_source;
-  printf("MUXNET - PEER - %d get packet peer was called. sender: %d\n", unique_id, peer);
+  // printf("MUXNET - PEER - %d get packet peer was called. sender: %d\n", unique_id, peer);
   return peer;
 }
 

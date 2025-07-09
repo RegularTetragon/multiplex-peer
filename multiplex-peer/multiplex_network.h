@@ -21,6 +21,7 @@ private:
 protected:
   static void _bind_methods();
 public:
+  void _callback_interface_connected(int to_interface_pid);
 	Error _register_mux_peer(MultiplexPeer *peer);
 	void _remove_mux_peer(MultiplexPeer *peer);
 	~MultiplexNetwork();

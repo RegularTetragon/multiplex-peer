@@ -1,15 +1,18 @@
 #include "multiplex_packet.h"
+#include <cstdio>
 #include <endian.h>
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/multiplayer_peer.hpp"
 #include "godot_cpp/core/error_macros.hpp"
 #include "godot_cpp/variant/packed_byte_array.hpp"
+#include "multiplex_peer.h"
 
 using namespace godot;
 
+
 MultiplexPacket::~MultiplexPacket() {
   if (subtype == MUX_DATA) {
-    ::free(contents.data.data);
+    delete contents.data.data;
   }
 }
 
@@ -47,10 +50,13 @@ Error MultiplexPacket::deserialize(PackedByteArray& rawData) {
       contents.data.length          = (uint32_t)be32toh(rawData.decode_u32(2 ));
       contents.data.mux_peer_source = ( int32_t)be32toh(rawData.decode_s32(6 ));
       contents.data.mux_peer_dest   = ( int32_t)be32toh(rawData.decode_s32(10));
-      
       // Length and packet size mismatch could imply someone is trying to do a buffer overrun attack
-      ERR_FAIL_COND_V_MSG(contents.data.length >= rawData.size() - 14, Error::ERR_INVALID_PARAMETER, "Packet reported length longer than packet received.");
-      
+      if (contents.data.length > rawData.size()-14) {
+        printf("%d > %d", contents.data.length, (int)rawData.size() - 14);
+      }
+      ERR_FAIL_COND_V_MSG(contents.data.length > rawData.size() - 14, Error::ERR_INVALID_PARAMETER, "Packet reported length longer than packet received.");
+      ERR_FAIL_COND_V_MSG(contents.data.length > MAX_MULTIPLEX_PACKET_SIZE - 14, Error::ERR_INVALID_PARAMETER, "Multiplex Packet too big to deserialize!");
+      contents.data.data = new uint8_t[contents.data.length];
       for (int i = 0; i < contents.data.length; i++) {
         contents.data.data[i] = rawData.decode_u8(i + 14);
       }
