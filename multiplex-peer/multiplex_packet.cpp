@@ -11,7 +11,7 @@ using namespace godot;
 
 
 MultiplexPacket::~MultiplexPacket() {
-  if (subtype == MUX_DATA) {
+  if (allocated) {
     delete contents.data.data;
   }
 }
@@ -57,6 +57,7 @@ Error MultiplexPacket::deserialize(PackedByteArray& rawData) {
       ERR_FAIL_COND_V_MSG(contents.data.length > rawData.size() - 14, Error::ERR_INVALID_PARAMETER, "Packet reported length longer than packet received.");
       ERR_FAIL_COND_V_MSG(contents.data.length > MAX_MULTIPLEX_PACKET_SIZE - 14, Error::ERR_INVALID_PARAMETER, "Multiplex Packet too big to deserialize!");
       contents.data.data = new uint8_t[contents.data.length];
+      allocated = true;
       for (int i = 0; i < contents.data.length; i++) {
         contents.data.data[i] = rawData.decode_u8(i + 14);
       }

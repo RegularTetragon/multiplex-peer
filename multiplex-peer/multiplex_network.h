@@ -22,8 +22,11 @@ protected:
   static void _bind_methods();
 public:
   void _callback_interface_connected(int to_interface_pid);
+  void _callback_interface_disconnected(int interface_pid);
+  int get_interface_id_from_subpeer_id(int subpeer_id);
 	Error _register_mux_peer(MultiplexPeer *peer);
 	void _remove_mux_peer(MultiplexPeer *peer);
+  void _close();
 	~MultiplexNetwork();
   Error set_interface(Ref<MultiplayerPeer> interface);
 	Error send(Ref<MultiplexPacket> packet, int32_t peer_id, int32_t channel, MultiplayerPeer::TransferMode transfer_mode);

@@ -17,36 +17,41 @@
   outputs = {self, nixpkgs, godot-cpp, ...}:
   let system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      pkgsCross = import nixpkgs {
+        inherit system;
+        crossSystem = {
+          config = "x86_64-w64-mingw32";
+        };
+        allowUnsupportedSystem = true;
+      };
       stdenv = pkgs.stdenv;
       mkSconsFlagsFromAttrSet = pkgs.lib.mapAttrsToList (
         k: v: if builtins.isString v then "${k}=${v}" else "${k}=${builtins.toJSON v}"
       );
   in {
+    devShells.${system}.default = pkgs.mkShell {
+      buildInputs = [pkgs.scons pkgsCross.buildPackages.gcc pkgsCross.windows.mcfgthreads];
+    };
     packages.${system} = {
       default = self.packages.${system}.godot-multiplex-peer;
-      godot-cpp = 
-      with stdenv; mkDerivation rec {
-        pname = "godot-cpp";
-        version = "1.0.0";
-        nativeBuildInputs = with pkgs; [scons pkgconf libgcc xorg.libXcursor xorg.libXinerama xorg.libXi xorg.libXrandr wayland-utils mesa libGLU libGL alsa-lib pulseaudio];
+      godot-multiplex-peer-windows = with stdenv; mkDerivation rec {
+        pname = "godot-multiplex-peer";
+        version = "0.0.1";
+        src = ./.;
+        nativeBuildInputs = with pkgs; [scons pkgsCross.buildPackages.gcc pkgsCross.windows.mcfgthreads];
         sconsFlags = mkSconsFlagsFromAttrSet {
           target = "editor";
-          platform = "linux";
+          platform = "windows";
           arch = "x86_64";
           compiledb="yes";
           dev_build="yes";
         };
-        src = godot-cpp;
-        installPhase = ''
-        ls -a
-        cp -rT . $out
-        '';
       };
       godot-multiplex-peer = with stdenv; mkDerivation rec {
         pname = "godot-multiplex-peer";
         version = "0.0.1";
         src = ./.;
-        nativeBuildInputs = with pkgs; [scons self.packages.${system}.godot-cpp];
+        nativeBuildInputs = with pkgs; [scons];
         sconsFlags = mkSconsFlagsFromAttrSet {
           target = "editor";
           platform = "linux";
@@ -54,13 +59,6 @@
           compiledb="yes";
           dev_build="yes";
         };
-        installPhase = ''
-        cp -r bin/ $out
-        cp LICENSE $out
-        cp README.md $out
-        cp steam-multiplayer-peer.gdextension $out
-        cp compile_commands.json $out
-        '';
       };
     };
   };

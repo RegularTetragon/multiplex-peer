@@ -75,9 +75,9 @@ library = env.SharedLibrary(
     source=sources,
 )
 
-copy = env.InstallAs("{}/addons/{}/bin/{}/{}".format(projectdir, projectdir, env["platform"], file), library)
+# copy = env.InstallAs("{}/addons/{}/bin/{}/{}".format(projectdir, projectdir, env["platform"], file), library)
 
-default_args = [library, copy]
+default_args = [library]
 if localEnv.get("compiledb", False):
     default_args += [compilation_db]
 Default(*default_args)

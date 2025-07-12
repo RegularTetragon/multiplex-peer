@@ -64,7 +64,10 @@ Error MultiplexPeer::_put_packet(const uint8_t *p_buffer, int32_t p_buffer_size)
 	return network->send(packet, target_peer, current_channel, current_transfer_mode);
 }
 void MultiplexPeer::_poll() {
-  printf("MUXNET - PEER - %d poll called\n", unique_id);
+  //printf("MUXNET - PEER - %d poll called\n", unique_id);
+  if (network->interface->get_unique_id() == 1 && get_connection_status() == CONNECTION_CONNECTING) {
+    complete_connection();
+  }
 	this->network->poll();
 }
 int32_t MultiplexPeer::_get_available_packet_count() const {
@@ -110,24 +113,44 @@ int32_t MultiplexPeer::_get_packet_peer() const {
 }
 
 void MultiplexPeer::_close() {
+  printf("MUXNET - Closing peer %d", get_unique_id());
 	if (this->active_mode == MODE_NONE) {
 		return;
 	}
-	Ref<MultiplexPacket> packet;
-	packet->subtype = MUX_CMD;
-	packet->transfer_mode = TRANSFER_MODE_RELIABLE;
-	packet->contents.data.mux_peer_source = this->_get_unique_id();
-	packet->contents.data.mux_peer_dest = 1;
-	packet->contents.command.subject_multiplex_peer = this->_get_unique_id();
-	packet->contents.command.subtype = MUX_CMD_REMOVE_PEER;
 	incoming_packets.clear();
-	this->network->send(packet, 1, 0, TRANSFER_MODE_RELIABLE);
 	this->active_mode = MODE_NONE;
-	this->network->_remove_mux_peer(this);
+  
+  if (unique_id == 1) {
+    for (auto e = network->internal_peers.begin(); e != network->internal_peers.end(); ++e) {
+      emit_signal("peer_disconnected", e->key);
+    }
+    for (auto e = network->external_peers.begin(); e != network->external_peers.end(); ++e) {
+      emit_signal("peer_disconnected", e->key);
+    }
+    network->interface->close();
+  }
+  else {
+	  this->network->send_command(MUX_CMD_REMOVE_PEER, this->_get_unique_id(), 1);
+    emit_signal("peer_disconnected", 1);
+  }
+  connection_status = CONNECTION_DISCONNECTED;
 }
 
 void MultiplexPeer::_disconnect_peer(int32_t p_peer, bool p_force) {
-	this->network->disconnect_peer(p_peer, p_force);
+  if (this->network->internal_peers.has(p_peer)) {
+    this->network->internal_peers.get(p_peer)->close();
+  }
+  if (this->network->external_peers.has(p_peer)) {
+    if (p_peer == 1) {
+      this->close();
+    }
+    else if (unique_id == 1) {
+      this->network->external_peers.erase(p_peer);
+      if (!p_force) {
+        emit_signal("peer_disconnected", p_peer);
+      }
+    }
+  }
 }
 
 MultiplayerPeer::ConnectionStatus MultiplexPeer::_get_connection_status() const {
@@ -175,3 +198,4 @@ void MultiplexPeer::complete_connection() {
     }
   }
 }
+

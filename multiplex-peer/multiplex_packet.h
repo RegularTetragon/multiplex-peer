@@ -64,6 +64,7 @@ class MultiplexPacket : public godot::RefCounted {
 public:
 	MultiplexPacketSubtype subtype;
 	godot::MultiplayerPeer::TransferMode transfer_mode;
+  bool allocated = false;
 	union {
 		MultiplexPacketCommand command;
 		MultiplexPacketData data;
