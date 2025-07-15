@@ -132,6 +132,7 @@ void MultiplexPeer::_close() {
   else {
 	  this->network->send_command(MUX_CMD_REMOVE_PEER, this->_get_unique_id(), 1);
     emit_signal("peer_disconnected", 1);
+    
   }
   connection_status = CONNECTION_DISCONNECTED;
 }
@@ -145,6 +146,7 @@ void MultiplexPeer::_disconnect_peer(int32_t p_peer, bool p_force) {
       this->close();
     }
     else if (unique_id == 1) {
+      this->network->send_command(MUX_CMD_REMOVE_PEER, p_peer, this->network->external_peers.get(p_peer));
       this->network->external_peers.erase(p_peer);
       if (!p_force) {
         emit_signal("peer_disconnected", p_peer);

@@ -225,6 +225,16 @@ Error MultiplexNetwork::handle_command_sub(int32_t sender_pid, Ref<MultiplexPack
 					"Subject peer of ACK is not local.");
 			internal_peers.get(multiplex_packet->contents.command.subject_multiplex_peer)->complete_connection();
       return godot::OK;
+    case MUX_CMD_REMOVE_PEER: {
+      // Server is telling us they have removed this peer
+      int subject = multiplex_packet->contents.command.subject_multiplex_peer;
+      printf("MUXNET - SUB - Server forced removed peer %d", subject);
+      ERR_FAIL_COND_V_MSG(!internal_peers.has(subject), ERR_DOES_NOT_EXIST, "MUXNET - SUB - Peer to remove not present");
+      internal_peers.get(subject)->emit_signal("peer_disconnected", 1);
+      internal_peers.get(subject)->active_mode = MultiplexPeer::MODE_NONE;
+      internal_peers.get(subject)->incoming_packets.clear();
+      internal_peers.erase(subject);
+    }
 		case MUX_CMD_ERR_SUBPEERS_EXCEEDED:
 			internal_peers.get(multiplex_packet->contents.command.subject_multiplex_peer)->close();
 			ERR_FAIL_V_MSG(godot::ERR_CANT_CONNECT, "MUXNET - SUB - received add peer error: maximum subpeers exceeded.");

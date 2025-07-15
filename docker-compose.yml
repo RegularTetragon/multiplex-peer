@@ -1,0 +1,9 @@
+# Nix's cross compilation is bugged, this will have to do for now...
+services:
+  windows:
+    build: .
+    entrypoint: platform=windows
+  volumes:
+    - type: volume
+      source: ./bin/windows
+      target: /root/multiplex-peer/bin/windows
