@@ -12,18 +12,18 @@
 
 using namespace godot;
 
-Error MultiplexNetwork::set_interface(Ref<MultiplayerPeer> interface) {
-	this->interface = interface;
+Error MultiplexNetwork::set_host_peer(Ref<MultiplayerPeer> host_peer) {
+	this->host_peer = host_peer;
 	internal_peers = HashMap<int32_t, Ref<MultiplexPeer>>();
 	external_peers = HashMap<int32_t, int32_t>();
-  interface->connect("peer_connected", Callable(this, "_callback_interface_connected"));
-  interface->connect("peer_disconnected", Callable(this, "_callback_interface_disconnected"));
+  host_peer->connect("peer_connected", Callable(this, "_callback_host_peer_connected"));
+  host_peer->connect("peer_disconnected", Callable(this, "_callback_host_peer_disconnected"));
   return OK;
 }
 
-void MultiplexNetwork::_callback_interface_connected(int to_interface_pid) {
-  printf("MUXNET - interface %d connected to interface %d\n", interface->get_unique_id(), to_interface_pid);
-  if (to_interface_pid == 1) {
+void MultiplexNetwork::_callback_host_peer_connected(int to_host_peer_pid) {
+  printf("MUXNET - host_peer %d connected to host_peer %d\n", host_peer->get_unique_id(), to_host_peer_pid);
+  if (to_host_peer_pid == 1) {
     this->external_peers.insert(1, 1);
     for (auto e = this->internal_peers.begin(); e != this->internal_peers.end(); ++e) {
       send_command(MUX_CMD_ADD_PEER, e->value->get_unique_id(), 1);
@@ -34,9 +34,9 @@ void MultiplexNetwork::_callback_interface_connected(int to_interface_pid) {
   }
 }
 
-void MultiplexNetwork::_callback_interface_disconnected(int to_interface_pid) {
-  printf("MUXNET - interface %d disconnected from interface %d\n", to_interface_pid, interface->get_unique_id());
-  if (to_interface_pid == 1) {
+void MultiplexNetwork::_callback_host_peer_disconnected(int to_host_peer_pid) {
+  printf("MUXNET - host_peer %d disconnected from host_peer %d\n", to_host_peer_pid, host_peer->get_unique_id());
+  if (to_host_peer_pid == 1) {
     for (auto e = this->internal_peers.begin(); e != this->internal_peers.end(); ++e) {
       e->value->close();
     }
@@ -46,7 +46,7 @@ void MultiplexNetwork::_callback_interface_disconnected(int to_interface_pid) {
   else {
     List<int> to_delete;
     for (auto e = this->external_peers.begin(); e != this->external_peers.end(); ++e) {
-      if (e->value == to_interface_pid) {
+      if (e->value == to_host_peer_pid) {
         to_delete.push_back(e->key);
       }
     }
@@ -60,7 +60,7 @@ void MultiplexNetwork::_callback_interface_disconnected(int to_interface_pid) {
 }
 
 MultiplexNetwork::~MultiplexNetwork() {
-	this->interface->close();
+	this->host_peer->close();
 	for (HashMap<int32_t, Ref<MultiplexPeer>>::Iterator E = this->internal_peers.begin(); E; ++E) {
 		E->value->_close();
 	}
@@ -79,10 +79,10 @@ Error MultiplexNetwork::send(
 		peer->_put_multiplex_packet_direct(packet);
 		return OK;
 	} else if (this->external_peers.has(peer_id)) {
-		this->interface->set_transfer_mode(transfer_mode);
-		this->interface->set_target_peer(this->external_peers.get(peer_id));
-		this->interface->set_transfer_channel(channel);
-		return this->interface->put_packet(packet->serialize());
+		this->host_peer->set_transfer_mode(transfer_mode);
+		this->host_peer->set_target_peer(this->external_peers.get(peer_id));
+		this->host_peer->set_transfer_channel(channel);
+		return this->host_peer->put_packet(packet->serialize());
 	} else {
 		ERR_FAIL_V_MSG(godot::ERR_CANT_CONNECT, "No known peer for peer_id");
 	}
@@ -102,15 +102,15 @@ Error MultiplexNetwork::disconnect_peer(int32_t mux_peer_id, bool force) {
 
 void MultiplexNetwork::poll() {
   Error error = godot::OK;
-	this->interface->poll();
-  if (this->interface->get_available_packet_count() == 0) {
+	this->host_peer->poll();
+  if (this->host_peer->get_available_packet_count() == 0) {
     return;
   }
-	while (this->interface->get_available_packet_count()) {
-    // printf("MUXNET - Num packets: %d\n", this->interface->get_available_packet_count());
-		int32_t sender_interface_pid = this->interface->get_packet_peer();
-		PackedByteArray packet = this->interface->get_packet();
-    error = this->interface->get_packet_error();
+	while (this->host_peer->get_available_packet_count()) {
+    // printf("MUXNET - Num packets: %d\n", this->host_peer->get_available_packet_count());
+		int32_t sender_host_peer_pid = this->host_peer->get_packet_peer();
+		PackedByteArray packet = this->host_peer->get_packet();
+    error = this->host_peer->get_packet_error();
     ERR_CONTINUE_MSG(error != OK, "Error when getting packet.");
 		Ref<MultiplexPacket> multiplex_packet = Ref<MultiplexPacket>(memnew(MultiplexPacket));
 		error = multiplex_packet->deserialize(packet);
@@ -123,10 +123,10 @@ void MultiplexNetwork::poll() {
 		// Data packets are put into their corresponding network packet
 		switch (multiplex_packet->subtype) {
 			case MUX_CMD:
-				if (interface->get_unique_id() == 1) {
-					handle_command_dom(sender_interface_pid, multiplex_packet);
+				if (host_peer->get_unique_id() == 1) {
+					handle_command_dom(sender_host_peer_pid, multiplex_packet);
 				} else {
-					handle_command_sub(sender_interface_pid, multiplex_packet);
+					handle_command_sub(sender_host_peer_pid, multiplex_packet);
 				}
 				break;
 			case MUX_DATA:
@@ -135,10 +135,10 @@ void MultiplexNetwork::poll() {
 						"Multiplex destination peer id is not available locally");
 				ERR_CONTINUE_MSG(
 						!external_peers.has(multiplex_packet->contents.data.mux_peer_source),
-						"Multiplex source peer id is not associated with any remote interface");
+						"Multiplex source peer id is not associated with any remote host_peer");
 				ERR_CONTINUE_MSG(
-						external_peers.get(multiplex_packet->contents.data.mux_peer_source) != sender_interface_pid,
-						"Multiplex source peer id is not associated with the provided interface peer id. Possible attempt at cheating.");
+						external_peers.get(multiplex_packet->contents.data.mux_peer_source) != sender_host_peer_pid,
+						"Multiplex source peer id is not associated with the provided host_peer peer id. Possible attempt at cheating.");
 				internal_peers.get(multiplex_packet->contents.data.mux_peer_dest)->_put_multiplex_packet_direct(multiplex_packet);
 				break;
 		}
@@ -147,7 +147,7 @@ void MultiplexNetwork::poll() {
 }
 
 Error MultiplexNetwork::handle_command_dom(int32_t sender_pid, Ref<MultiplexPacket> multiplex_packet) {
-	printf("MUXNET - DOM - Received command %d from interface %d about peer %d.\n", multiplex_packet->contents.command.subtype, sender_pid, multiplex_packet->contents.command.subject_multiplex_peer);
+	printf("MUXNET - DOM - Received command %d from host_peer %d about peer %d.\n", multiplex_packet->contents.command.subtype, sender_pid, multiplex_packet->contents.command.subject_multiplex_peer);
   switch (multiplex_packet->contents.command.subtype) {
 		case MUX_CMD_ADD_PEER: {
       printf("MUXNET - DOM - Received command MUX_CMD_ADD_PEER\n");
@@ -189,7 +189,7 @@ Error MultiplexNetwork::handle_command_dom(int32_t sender_pid, Ref<MultiplexPack
     case MUX_CMD_REMOVE_PEER: {
       int subject = multiplex_packet->contents.command.subject_multiplex_peer;
       printf("MUXNET - DOM - Request to remove subpeer %d\n", subject);
-      if (sender_pid != interface->get_unique_id()) {
+      if (sender_pid != host_peer->get_unique_id()) {
         ERR_FAIL_COND_V_MSG(!external_peers.has(subject), godot::ERR_DOES_NOT_EXIST, "MUXNET - DOM - Requested peer to remove does not exist.");
         ERR_FAIL_COND_V_MSG(external_peers.get(subject) != sender_pid, godot::ERR_UNAUTHORIZED, "MUXNET - Peer removal command was not sent by owner of peer.");
         internal_peers.get(1)->emit_signal("peer_disconnected", subject);
@@ -209,7 +209,7 @@ Error MultiplexNetwork::handle_command_dom(int32_t sender_pid, Ref<MultiplexPack
 }
 
 Error MultiplexNetwork::handle_command_sub(int32_t sender_pid, Ref<MultiplexPacket> multiplex_packet) {
-	printf("MUXNET - SUB - Received command %d from interface %d about peer %d\n", multiplex_packet->contents.command.subtype, sender_pid, multiplex_packet->contents.command.subject_multiplex_peer);
+	printf("MUXNET - SUB - Received command %d from host_peer %d about peer %d\n", multiplex_packet->contents.command.subtype, sender_pid, multiplex_packet->contents.command.subject_multiplex_peer);
   switch (multiplex_packet->contents.command.subtype) {
 		case MUX_CMD_ADD_PEER:
 			external_peers.insert(
@@ -250,11 +250,11 @@ Error MultiplexNetwork::handle_command_sub(int32_t sender_pid, Ref<MultiplexPack
 
 Error MultiplexNetwork::_register_mux_peer(MultiplexPeer *peer) {
   ERR_FAIL_COND_V_MSG(internal_peers.has(peer->get_unique_id()),ERR_ALREADY_EXISTS,"Local peer with pid already exists");
-  ERR_FAIL_COND_V_EDMSG(interface.is_null(), godot::ERR_DOES_NOT_EXIST, "Interface not set");
-  ERR_FAIL_COND_V_EDMSG(!interface.is_valid(), godot::ERR_UNCONFIGURED, "Interface registered but not valid");
+  ERR_FAIL_COND_V_EDMSG(host_peer.is_null(), godot::ERR_DOES_NOT_EXIST, "host_peer not set");
+  ERR_FAIL_COND_V_EDMSG(!host_peer.is_valid(), godot::ERR_UNCONFIGURED, "host_peer registered but not valid");
   printf("MUXNET - registering internal mux peer %d\n", peer->get_unique_id());
   this->internal_peers.insert(peer->get_unique_id(), Ref<MultiplexPeer>(peer));
-  if (interface->get_unique_id() != 1 && interface->get_connection_status() == godot::MultiplayerPeer::CONNECTION_CONNECTED) {
+  if (host_peer->get_unique_id() != 1 && host_peer->get_connection_status() == godot::MultiplayerPeer::CONNECTION_CONNECTED) {
     printf("MUXNET - requesting add of late subpeer");
     send_command(MUX_CMD_ADD_PEER, peer->get_unique_id(), 1);
   }
@@ -265,37 +265,37 @@ void MultiplexNetwork::_remove_mux_peer(MultiplexPeer *peer) {
   internal_peers.erase(peer->get_unique_id());
 }
 
-Error MultiplexNetwork::send_command(MultiplexPacketCommandSubtype subtype, int32_t subject_multiplex_peer, int32_t to_interface_pid) {
-  printf("MUXNET - sending command %d about %d to %d\n", subtype, subject_multiplex_peer, to_interface_pid);
+Error MultiplexNetwork::send_command(MultiplexPacketCommandSubtype subtype, int32_t subject_multiplex_peer, int32_t to_host_peer_pid) {
+  printf("MUXNET - sending command %d about %d to %d\n", subtype, subject_multiplex_peer, to_host_peer_pid);
   Ref<MultiplexPacket> packet = Ref<MultiplexPacket>(memnew(MultiplexPacket));
   packet->subtype = MUX_CMD;
   packet->transfer_mode = godot::MultiplayerPeer::TRANSFER_MODE_RELIABLE;
   packet->contents.command.subtype = subtype;
   packet->contents.command.subject_multiplex_peer = subject_multiplex_peer;
-  if (to_interface_pid == interface->get_unique_id()) {
+  if (to_host_peer_pid == host_peer->get_unique_id()) {
     // loopback;
-    if (this->interface->get_unique_id() == 1) {
-      return this->handle_command_dom(this->interface->get_unique_id(), packet);
+    if (this->host_peer->get_unique_id() == 1) {
+      return this->handle_command_dom(this->host_peer->get_unique_id(), packet);
     }
     else {
-      return this->handle_command_sub(this->interface->get_unique_id(), packet);
+      return this->handle_command_sub(this->host_peer->get_unique_id(), packet);
     }
   }
   else {
-    interface->set_target_peer(to_interface_pid);
-    interface->set_transfer_channel(1);
-    interface->set_transfer_mode(MultiplayerPeer::TRANSFER_MODE_RELIABLE);
-    return interface->put_packet(packet->serialize());
+    host_peer->set_target_peer(to_host_peer_pid);
+    host_peer->set_transfer_channel(1);
+    host_peer->set_transfer_mode(MultiplayerPeer::TRANSFER_MODE_RELIABLE);
+    return host_peer->put_packet(packet->serialize());
   }
 }
 
-Ref<MultiplayerPeer> MultiplexNetwork::_get_interface() {
-  return interface;
+Ref<MultiplayerPeer> MultiplexNetwork::_get_host_peer() {
+  return host_peer;
 }
 
-int MultiplexNetwork::get_interface_id_from_subpeer_id(int subpeer_id) {
+int MultiplexNetwork::get_host_peer_id_from_subpeer_id(int subpeer_id) {
   if (internal_peers.has(subpeer_id)) {
-    return interface->get_unique_id();
+    return host_peer->get_unique_id();
   }
   else if (external_peers.has(subpeer_id)) {
     return external_peers.get(subpeer_id);
@@ -304,9 +304,9 @@ int MultiplexNetwork::get_interface_id_from_subpeer_id(int subpeer_id) {
 }
 
 void MultiplexNetwork::_bind_methods() {
-  ClassDB::bind_method(D_METHOD("set_interface", "interface"), &MultiplexNetwork::set_interface);
-  ClassDB::bind_method(D_METHOD("_callback_interface_connected", "to_interface_pid"), &MultiplexNetwork::_callback_interface_connected);
-  ClassDB::bind_method(D_METHOD("_callback_interface_disconnected", "to_interface_pid"), &MultiplexNetwork::_callback_interface_disconnected);
-  ClassDB::bind_method(D_METHOD("get_interface_id_from_subpeer_id", "subpeer_id"), &MultiplexNetwork::get_interface_id_from_subpeer_id);
+  ClassDB::bind_method(D_METHOD("set_host_peer", "host_peer"), &MultiplexNetwork::set_host_peer);
+  ClassDB::bind_method(D_METHOD("_callback_host_peer_connected", "to_host_peer_pid"), &MultiplexNetwork::_callback_host_peer_connected);
+  ClassDB::bind_method(D_METHOD("_callback_host_peer_disconnected", "to_host_peer_pid"), &MultiplexNetwork::_callback_host_peer_disconnected);
+  ClassDB::bind_method(D_METHOD("get_host_peer_id_from_subpeer_id", "subpeer_id"), &MultiplexNetwork::get_host_peer_id_from_subpeer_id);
 }
 

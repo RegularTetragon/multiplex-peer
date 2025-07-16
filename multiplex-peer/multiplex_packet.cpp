@@ -1,6 +1,7 @@
 #include "multiplex_packet.h"
 #include <cstdio>
-#include <endian.h>
+
+
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/multiplayer_peer.hpp"
 #include "godot_cpp/core/error_macros.hpp"
@@ -24,9 +25,9 @@ PackedByteArray MultiplexPacket::serialize() {
     out.fill(0);
     out.encode_u8(0, (uint8_t)subtype);
     out.encode_u8(1, (uint8_t)transfer_mode);
-    out.encode_u32(2, htobe32(contents.data.length));
-    out.encode_s32(6, htobe32(contents.data.mux_peer_source));
-    out.encode_s32(10,htobe32(contents.data.mux_peer_dest));
+    out.encode_u32(2, contents.data.length);
+    out.encode_s32(6, contents.data.mux_peer_source);
+    out.encode_s32(10,contents.data.mux_peer_dest);
     for (int i = 0; i < contents.data.length; i++) {
       out.encode_u8(i + 14, contents.data.data[i]);
     }
@@ -37,7 +38,7 @@ PackedByteArray MultiplexPacket::serialize() {
     out.encode_u8 (0, (uint8_t)subtype);
     out.encode_u8 (1, (uint8_t)transfer_mode);
     out.encode_u8 (2, (uint8_t)contents.command.subtype);
-    out.encode_s32(3, htobe32((int32_t)contents.command.subject_multiplex_peer));
+    out.encode_s32(3, (int32_t)contents.command.subject_multiplex_peer);
   }
   return out;
 }
@@ -47,9 +48,9 @@ Error MultiplexPacket::deserialize(PackedByteArray& rawData) {
   transfer_mode = (MultiplayerPeer::TransferMode)(uint8_t)rawData.decode_u8(1);
   switch (subtype) {
     case MUX_DATA:
-      contents.data.length          = (uint32_t)be32toh(rawData.decode_u32(2 ));
-      contents.data.mux_peer_source = ( int32_t)be32toh(rawData.decode_s32(6 ));
-      contents.data.mux_peer_dest   = ( int32_t)be32toh(rawData.decode_s32(10));
+      contents.data.length          = (uint32_t)rawData.decode_u32(2 );
+      contents.data.mux_peer_source = ( int32_t)rawData.decode_s32(6 );
+      contents.data.mux_peer_dest   = ( int32_t)rawData.decode_s32(10);
       // Length and packet size mismatch could imply someone is trying to do a buffer overrun attack
       if (contents.data.length > rawData.size()-14) {
         printf("%d > %d", contents.data.length, (int)rawData.size() - 14);
@@ -74,7 +75,7 @@ Error MultiplexPacket::deserialize(PackedByteArray& rawData) {
         default:
           ERR_FAIL_V_MSG(godot::ERR_PARSE_ERROR, "Invalid multiplex command subtype, must be 0x00 to 0x04. Is the packet corrupted?");
       }
-      contents.command.subject_multiplex_peer = (int32_t)be32toh(rawData.decode_s32(3));
+      contents.command.subject_multiplex_peer = (int32_t)rawData.decode_s32(3);
       break;
     default:
       ERR_FAIL_V_MSG(godot::ERR_PARSE_ERROR, "Invalid multiplex packet subtype, must be 0x00 (DATA) or 0x01 (CMD)");

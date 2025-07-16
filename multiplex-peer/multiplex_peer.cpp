@@ -65,7 +65,7 @@ Error MultiplexPeer::_put_packet(const uint8_t *p_buffer, int32_t p_buffer_size)
 }
 void MultiplexPeer::_poll() {
   //printf("MUXNET - PEER - %d poll called\n", unique_id);
-  if (network->interface->get_unique_id() == 1 && get_connection_status() == CONNECTION_CONNECTING) {
+  if (network->host_peer->get_unique_id() == 1 && get_connection_status() == CONNECTION_CONNECTING) {
     complete_connection();
   }
 	this->network->poll();
@@ -76,7 +76,7 @@ int32_t MultiplexPeer::_get_available_packet_count() const {
 
 int32_t MultiplexPeer::_get_max_packet_size() const {
 	return this->network.is_null()						? 0
-			: this->network->_get_interface().is_null() ? 0
+			: this->network->_get_host_peer().is_null() ? 0
 														: MAX_MULTIPLEX_PACKET_SIZE;
 }
 
@@ -127,7 +127,7 @@ void MultiplexPeer::_close() {
     for (auto e = network->external_peers.begin(); e != network->external_peers.end(); ++e) {
       emit_signal("peer_disconnected", e->key);
     }
-    network->interface->close();
+    network->host_peer->close();
   }
   else {
 	  this->network->send_command(MUX_CMD_REMOVE_PEER, this->_get_unique_id(), 1);
@@ -168,8 +168,8 @@ MultiplayerPeer::TransferMode MultiplexPeer::_get_packet_mode() const {
 
 bool MultiplexPeer::_is_server_relay_supported() const {
 	ERR_FAIL_COND_V_MSG(this->network.is_null(), 0, "MultiplexPeer has no associated network.");
-	ERR_FAIL_COND_V_MSG(this->network->_get_interface().is_null(), 0, "MultiplexNetwork has no interface");
-	return this->network->_get_interface()->is_server_relay_supported();
+	ERR_FAIL_COND_V_MSG(this->network->_get_host_peer().is_null(), 0, "MultiplexNetwork has no host_peer");
+	return this->network->_get_host_peer()->is_server_relay_supported();
 }
 
 Error MultiplexPeer::_put_multiplex_packet_direct(Ref<MultiplexPacket> packet) {

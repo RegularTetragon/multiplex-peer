@@ -37,80 +37,136 @@ Instead of reworking the SteamMultiplayerPeers, I decided to solve this issue mo
 that had a similar assumption I'd prefer to not have to patch that platform's networking peer in the same manner. As such I created this MultiplexPeer
 which is capable of wrapping another peer to act as its interface to the outside world. Each side of the server/client boundry is then able to create
 multiple MultiplexPeers which route packets internally through a Multiplex Network.
-# Usage
 
-My game starts up servers and clients like so:
+# Adding to your project
 
-```gdscript
-func start_client_mux_enet(address: String, port: int) -> Client:
-	print("GAME  - Starting client over mux'd enet ", address, " and port ", port)
-	var interface = ENetMultiplayerPeer.new()
-	interface.create_client(
-		address, port
-	)
-	var mux_net = MultiplexNetwork.new()
-	mux_net.set_interface(interface)
+You can git clone this repo from the master branch straight into your addons directory, add it as a submodule, or unzip this repo
+into your addons folder. This is the primarily supported way of running this addon for now, however all that is really needed
+for godot to work with this addon are the bin folder and multiplex-peer.gdextension.
 
-	var client_mux_peer = MultiplexPeer.new()
-	client_mux_peer.create_client(mux_net)
+# Compiling
 
-	return start_client(client_mux_peer)
+## Precompiled
 
+The bin/ directory **should** contain the most recent version of this repo.
 
-func start_server_mux_enet(
-	port: int,
-	max_players: int,
-	local_multiplayer: int, 
-	gamemode: GamemodeResource,
-	level: LevelResource
-):
-	var interface = ENetMultiplayerPeer.new()
-	var error
-	error = interface.create_server(port, max_players)
-	if error != OK:
-		print("GAME   - Error starting server")
-		main_menu.show_error(error_string(error))
-		return
-	
+## Docker
 
-	var mux_net = MultiplexNetwork.new()
-	# set interface checks whether the interface is a client or server.
-	# if it is a server, it begins listening for mux_net packets and
-	# forwards them to registered peers.
+Ideally at some point I'll port this all to use just nix, however there are currently some outstanding bugs with
+nix that make that difficult. As such, the easiest way to compile for all platforms is to run:
 
-	# if the interface is a client, it begins a handshake with the mux on the other side
-	# using the interface as an intermediate
-	error = mux_net.set_interface(interface)
-	if error != OK:
-		print("GAME   - Error starting Mux")
-		main_menu.show_error(error_string(error))
-		return
-	
-	var mux_server_peer = MultiplexPeer.new()
-	mux_server_peer.create_server(mux_net, max_players)
-	
-	start_server(mux_server_peer, gamemode, level)
-
-	mux_server_peer.complete_connection()
-	$GridContainer.columns = max(1, ceil(sqrt(float(local_multiplayer-1))))
-	for i in range(0, local_multiplayer):
-		var mux_client_peer = MultiplexPeer.new()
-		error = mux_client_peer.create_client(mux_net)
-		if error != OK:
-			print("GAME  - Error starting client")
-			main_menu.show_error(error_string(error))
-			return
-		var client = start_client(mux_client_peer)
-		mux_client_peer.complete_connection()
-		client.input_device_id = i
-		if i == 0:
-			client.closed.connect(
-				func(_msg): 
-					mux_server_peer.quit()
-			)
+```
+docker-compose up --build all
 ```
 
-This library is still in pretty deep development, so proper documentation is still pending.
+Inside the base directory. This should work with a fresh pull, and will will populate bin/linux and bin/windows
+with the necessary .so and dll files. I recommend this over just running `docker-compose up --build`, because doing
+that is very CPU intensive and may fail with unrelated error messages.
+
+If you prefer you can build for a single platform at a time like this
+
+```
+docker-compose up --build linux-release
+```
+
+## Manual
+
+If you prefer not to use docker you should be able to do everything manually with scons according to
+Godot's official build instructions for your platform.
+There are no other dependencies aside from the `godot-cpp` submodule. You can pull this submodule the usual way:
+
+```
+git submodule update --recursive
+```
+
+A basic build command that will generate the debug version for your platform is
+
+```
+scons dev_build=yes
+```
+This is the command I use while developing this repo.
+
+On NixOS specifically you can enter a `nix develop` shell and then run the desired scons command. `nix build` may or may not work.
+
+# Usage
+
+Normally Godot peers communicate over some network medium, such as UDP, Bluetooth, or some sort of relay service. MultiplexPeers also need a medium to communicate
+over. In this case however, this medium is an object tracked by Godot called a MultiplexNetwork. A MultiplexNetwork sorts out whether messages are being sent
+to local peers or to remote peers. You construct a MultiplexNetwork like so:
+
+```
+var mux_net = MultiplexNetwork.new()
+```
+
+Now a multiplex network needs a "host peer" to wrap. To clarify, this "host peer" can either be acting like a server or a client. Currently mesh peers are not supported.
+```gdscript
+# create client
+var interface = ENetMultiplayerPeer.new()
+interface.create_client(
+	address,
+	port
+)
+var mux_net = MultiplexNetwork.new()
+mux_net.set_host_peer(interface)
+```
+
+```gdscript
+
+# create server
+var interface = ENetMultiplayerPeer.new()
+error = interface.create_server(port, max_players)
+var mux_net = MultiplexNetwork.new()
+mux_net.set_host_peer(interface)
+```
+
+Now, we can make many subpeers that communicate over this mux_net. MuxNet keeps track of which of these subpeers are local and which ones are remote.
+If a subpeer is local, they communicate directly without using the interface at all. If they subpeer is remote, the outgoing packet is wrapped in 
+the MultiplexPeer protocol, and sent over the host peer, to be unwrapped by the receiving MuxNet on the other side.
+
+```gdscript
+# create server
+var mux_server_peer = MultiplexPeer.new()
+mux_server_peer.create_server(mux_net, max_players)
+var server = server_prefab.instantiate()
+add_child(server)
+get_tree().set_multiplayer(
+    MultiplayerAPI.create_default_interface(),
+    server.get_path()
+)
+server.multiplayer.peer = mux_server_peer
+
+for i in range(num_local_players):
+    var mux_client_peer = MultiplexPeer.new()
+    mux_client_peer.create_client(mux_net)
+    var client = client_prefab.instantiate()
+    add_child(client)
+
+    get_tree().set_multiplayer(
+        MultiplayerAPI.create_default_interface(),
+        client.get_path()
+    )
+    client.multiplayer.peer = mux_client_peer
+```
+
+```gdscript
+# create client
+
+for i in range(num_split_screen_players):
+    var mux_client_peer = MultiplexPeer.new()
+    mux_client_peer.create_client(mux_net)
+    var client = client_prefab.instantiate()
+    get_tree().add_child(client)
+
+    get_tree().set_multiplayer(
+        MultiplayerAPI.create_default_interface(),
+        client.get_path()
+    )
+    client.multiplayer.peer = mux_client_peer
+```
+
+Now each MultiplexPeer can effectively share a single MultiplayerPeer. This means no special considerations need to be made for host vs server mode. Each MultiplexPeer manages being opened and closed independently,
+however when then interface is closed or if subpeer 1 is closed all subpeers will be closed. Keep in mind: on the client closing all subpeers will not close the host peer, you will need to issue that command separately.
+
 
 # Acknowledgements
 
