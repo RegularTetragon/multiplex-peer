@@ -53,15 +53,14 @@ The bin/ directory **should** contain the most recent version of this repo.
 ## Docker
 
 Ideally at some point I'll port this all to use just nix, however there are currently some outstanding bugs with
-nix that make that difficult. As such, the easiest way to compile for all platforms is to run:
+nix that make that difficult. As such, the easiest way to compile for a given platform is:
 
 ```
-docker-compose up --build all
+docker-compose up --build <linux|windows|windows-32>-<debug|release>
 ```
-
-Inside the base directory. This should work with a fresh pull, and will will populate bin/linux and bin/windows
-with the necessary .so and dll files. I recommend this over just running `docker-compose up --build`, because doing
-that is very CPU intensive and may fail with unrelated error messages.
+depending on what platform you are trying to build for inside the base directory. This should work with a fresh pull, and will will populate bin/linux and bin/windows
+with the necessary .so and dll files. I recommend running each independently instead of `docker-compose up --build`, because
+doing that is very CPU intensive and may fail with unrelated error messages (at least it does on my machine).
 
 If you prefer you can build for a single platform at a time like this
 

@@ -1,46 +1,46 @@
 # Nix's cross compilation is bugged, this will have to do for now...
 services:
-  all:
-    build: .
-    entrypoint: scons platform=linux target=template_debug dev_build=yes && scons platform=linux target=template_release && scons platform=windows target=template_debug arch=x86_64 dev_build=yes && scons platform=windows target=template_release arch=x86_64 && scons platform=windows target=template_debug arch=x86_32 dev_build=yes && scons platform=windows target=template_release arch=x86_32
-    volumes:
-      - ./bin:/root/multiplex-peer/bin
-      - cache:/root/multiplex-peer/.cache
   linux-debug:
     build: .
     entrypoint: scons platform=linux target=template_debug dev_build=yes
     volumes:
       - ./bin/linux:/root/multiplex-peer/bin/linux
+      - ./multiplex-peer:/root/multiplex-peer/multiplex-peer
       - cache:/root/multiplex-peer/.cache
   linux-release:
     build: .
     entrypoint: scons platform=linux target=template_release
     volumes:
       - ./bin/linux:/root/multiplex-peer/bin/linux
+      - ./multiplex-peer:/root/multiplex-peer/multiplex-peer
       - cache:/root/multiplex-peer/.cache
   windows-debug:
     build: .
     entrypoint: scons platform=windows target=template_debug arch=x86_64 dev_build=yes
     volumes:
       - ./bin/windows:/root/multiplex-peer/bin/windows
+      - ./multiplex-peer:/root/multiplex-peer/multiplex-peer
       - cache:/root/multiplex-peer/.cache
   windows-release:
     build: .
     entrypoint: scons platform=windows target=template_release arch=x86_64
     volumes:
       - ./bin/windows:/root/multiplex-peer/bin/windows
+      - ./multiplex-peer:/root/multiplex-peer/multiplex-peer
       - cache:/root/multiplex-peer/.cache
   windows-32-debug:
     build: .
     entrypoint: scons platform=windows target=template_debug arch=x86_32 dev_build=yes
     volumes:
       - ./bin/windows:/root/multiplex-peer/bin/windows
+      - ./multiplex-peer:/root/multiplex-peer/multiplex-peer
       - cache:/root/multiplex-peer/.cache
   windows-32-release:
     build: .
     entrypoint: scons platform=windows target=template_release arch=x86_32
     volumes:
       - ./bin/windows:/root/multiplex-peer/bin/windows
+      - ./multiplex-peer:/root/multiplex-peer/multiplex-peer
       - cache:/root/multiplex-peer/.cache
 volumes:
   cache:

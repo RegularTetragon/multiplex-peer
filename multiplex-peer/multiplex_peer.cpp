@@ -134,24 +134,24 @@ void MultiplexPeer::_close() {
     emit_signal("peer_disconnected", 1);
     
   }
+  this->network->internal_peers.erase(get_unique_id());
   connection_status = CONNECTION_DISCONNECTED;
 }
 
 void MultiplexPeer::_disconnect_peer(int32_t p_peer, bool p_force) {
-  if (this->network->internal_peers.has(p_peer)) {
-    this->network->internal_peers.get(p_peer)->close();
-  }
   if (this->network->external_peers.has(p_peer)) {
     if (p_peer == 1) {
+      // If the server disconnected from us then we should probably close.
       this->close();
     }
     else if (unique_id == 1) {
+      // If we're the server, tell the client to remove the subpeer, and remove it from our known external peers.
       this->network->send_command(MUX_CMD_REMOVE_PEER, p_peer, this->network->external_peers.get(p_peer));
       this->network->external_peers.erase(p_peer);
-      if (!p_force) {
-        emit_signal("peer_disconnected", p_peer);
-      }
     }
+  }
+  if (!p_force) {
+    emit_signal("peer_disconnected", p_peer);
   }
 }
 

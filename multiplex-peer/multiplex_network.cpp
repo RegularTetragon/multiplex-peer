@@ -192,15 +192,15 @@ Error MultiplexNetwork::handle_command_dom(int32_t sender_pid, Ref<MultiplexPack
       if (sender_pid != host_peer->get_unique_id()) {
         ERR_FAIL_COND_V_MSG(!external_peers.has(subject), godot::ERR_DOES_NOT_EXIST, "MUXNET - DOM - Requested peer to remove does not exist.");
         ERR_FAIL_COND_V_MSG(external_peers.get(subject) != sender_pid, godot::ERR_UNAUTHORIZED, "MUXNET - Peer removal command was not sent by owner of peer.");
-        internal_peers.get(1)->emit_signal("peer_disconnected", subject);
+        internal_peers.get(1)->disconnect_peer(subject);
         external_peers.erase(subject);
       }
       else {
         ERR_FAIL_COND_V_MSG(!internal_peers.has(subject), godot::ERR_DOES_NOT_EXIST, "MUXNET - DOM - Requested peer to remove does not exist.");
-        internal_peers.get(1)->emit_signal("peer_disconnected", subject);
+        internal_peers.get(1)->disconnect_peer(subject);
         internal_peers.erase(subject);
       }
-			break;
+      return godot::OK;
     }
 		default:
 			ERR_FAIL_V_MSG(godot::ERR_INVALID_PARAMETER, "MUXNET - DOM - Does not respond to provided command");
@@ -210,6 +210,7 @@ Error MultiplexNetwork::handle_command_dom(int32_t sender_pid, Ref<MultiplexPack
 
 Error MultiplexNetwork::handle_command_sub(int32_t sender_pid, Ref<MultiplexPacket> multiplex_packet) {
 	printf("MUXNET - SUB - Received command %d from host_peer %d about peer %d\n", multiplex_packet->contents.command.subtype, sender_pid, multiplex_packet->contents.command.subject_multiplex_peer);
+  int subject = multiplex_packet->contents.command.subject_multiplex_peer;
   switch (multiplex_packet->contents.command.subtype) {
 		case MUX_CMD_ADD_PEER:
 			external_peers.insert(
@@ -227,19 +228,21 @@ Error MultiplexNetwork::handle_command_sub(int32_t sender_pid, Ref<MultiplexPack
       return godot::OK;
     case MUX_CMD_REMOVE_PEER: {
       // Server is telling us they have removed this peer
-      int subject = multiplex_packet->contents.command.subject_multiplex_peer;
-      printf("MUXNET - SUB - Server forced removed peer %d", subject);
+      printf("MUXNET - SUB - Server forced removed peer %d\n", subject);
       ERR_FAIL_COND_V_MSG(!internal_peers.has(subject), ERR_DOES_NOT_EXIST, "MUXNET - SUB - Peer to remove not present");
-      internal_peers.get(subject)->emit_signal("peer_disconnected", 1);
-      internal_peers.get(subject)->active_mode = MultiplexPeer::MODE_NONE;
-      internal_peers.get(subject)->incoming_packets.clear();
+      internal_peers.get(subject)->close();
       internal_peers.erase(subject);
+      return godot::OK;
     }
 		case MUX_CMD_ERR_SUBPEERS_EXCEEDED:
+      printf("MUXNET - SUB - Server NACK'd %d: Max subpeers exceeded\n", subject);
+      ERR_FAIL_COND_V_MSG(!internal_peers.has(subject), ERR_DOES_NOT_EXIST, "MUXNET - SUB - nack'd subpeer does not exist.");
 			internal_peers.get(multiplex_packet->contents.command.subject_multiplex_peer)->close();
 			ERR_FAIL_V_MSG(godot::ERR_CANT_CONNECT, "MUXNET - SUB - received add peer error: maximum subpeers exceeded.");
       return godot::OK;
 		case MUX_CMD_ERR_SUBPEER_ID_EXISTS:
+      printf("MUXNET - SUB - Server NACK'd %d: Subpeer with pid already exists.\n", subject);
+      ERR_FAIL_COND_V_MSG(!internal_peers.has(subject), ERR_DOES_NOT_EXIST, "MUXNET - SUB - nack'd subpeer does not exist.");
 			internal_peers.get(multiplex_packet->contents.command.subject_multiplex_peer)->close();
 			ERR_FAIL_V_MSG(godot::ERR_CANT_CONNECT, "MUXNET - SUB - Client received add peer error: subpeer ID collision.");
 		default:
