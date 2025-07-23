@@ -1,7 +1,5 @@
 # Godot Multiplex Peer
-NOTE: This library is a work in progress and is not ready for production. Many things don't work in it yet.
-It currently has only been testing on Linux with local networking over the ENetMultiplayerPeer.
-I finally got my game working with it in an incredibly specific context, which is why it has been released in this state.
+NOTE: This library is in very active development and is likely not production ready. You may run into some bugs if you use this. If you run into any trouble please make an issue!
 
 Multiplex Peer is an implementation of a Godot MultiplayerPeerExtension that allows you to split an existing MultiplayerPeer into many multiplayer peers.
 This allows for easy local splitscreen multiplayer that utilizes the same netcode as the rest of your game, without special logic for hosts.
