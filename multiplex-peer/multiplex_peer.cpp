@@ -123,6 +123,8 @@ void MultiplexPeer::_close() {
   if (unique_id == 1) {
     for (auto e = network->internal_peers.begin(); e != network->internal_peers.end(); ++e) {
       emit_signal("peer_disconnected", e->key);
+      e->value->emit_signal("peer_disconnected", 1);
+      e->value->close();
     }
     for (auto e = network->external_peers.begin(); e != network->external_peers.end(); ++e) {
       emit_signal("peer_disconnected", e->key);
